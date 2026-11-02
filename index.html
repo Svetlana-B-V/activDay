@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Active Days Counter</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+    color: #c9d1d9;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .container {
+    max-width: 900px;
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  h1 { font-size: 24px; margin-bottom: 20px; color: #58a6ff; }
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .settings label {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    color: #8b949e;
+  }
+  .settings input {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 14px;
+  }
+  .settings input:focus { outline: none; border-color: #58a6ff; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: #58a6ff; margin-bottom: 4px; }
+  .stat-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .progress-bar {
+    height: 10px;
+    background: #0d1117;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    border: 1px solid #30363d;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #238636, #2ea043);
+    transition: width 0.5s ease;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  button {
+    padding: 10px 18px;
+    background: #238636;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+  }
+  button:hover:not(:disabled) { background: #2ea043; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: #30363d; }
+  button.secondary:hover:not(:disabled) { background: #484f58; }
+  button.danger { background: #da3633; }
+  button.danger:hover:not(:disabled) { background: #f85149; }
+  .grid-title { font-size: 14px; color: #8b949e; margin-bottom: 10px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(53, 1fr);
+    gap: 3px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .day {
+    width: 12px;
+    height: 12px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .day:hover { transform: scale(1.3); }
+  .day.active { background: #2ea043; border-color: #2ea043; }
+  .day.today { outline: 2px solid #58a6ff; }
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8b949e;
+    margin-top: 10px;
+  }
+  .legend .day { cursor: default; }
+  .message {
+    padding: 12px;
+    background: #0d1117;
+    border-left: 3px solid #58a6ff;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .message.success { border-color: #2ea043; }
+  .message.warning { border-color: #d29922; }
+  .message.error { border-color: #f85149; }
+  .api-status {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 20px;
+    padding: 10px;
+    background: #0d1117;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+  }
+  .api-status strong { color: #58a6ff; }
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #30363d;
+    border-top-color: #58a6ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔥 GitHub Active Days Counter</h1>
+
+  <div class="settings">
+    <label>GitHub username
+      <input type="text" id="username" placeholder="octocat">
+    </label>
+    <label>Дата начала
+      <input type="date" id="startDate">
+    </label>
+    <label>Дата цели
+      <input type="date" id="endDate">
+    </label>
+    <label>Цель (активных дней)
+      <input type="number" id="goalDays" min="1" value="100">
+    </label>
+  </div>
+
+  <div class="actions">
+    <button id="fetchBtn">🔄 Загрузить коммиты с GitHub</button>
+    <button id="markToday">✅ Отметить сегодня</button>
+    <button id="unmarkToday" class="secondary">❌ Снять отметку</button>
+    <button id="reset" class="danger">🗑 Сбросить ручные</button>
+  </div>
+
+  <div id="apiStatus" class="api-status">
+    Данные с GitHub ещё не загружены. Введи username и нажми «Загрузить».
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="value" id="daysPassed">0</div>
+      <div class="label">Дней прошло</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="activeDays">0</div>
+      <div class="label">Активных дней</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="daysLeft">0</div>
+      <div class="label">Дней до цели</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="daysRemaining">0</div>
+      <div class="label">Календарных осталось</div>
+    </div>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+  </div>
+
+  <div class="grid-title">Активность по дням (зелёный = коммит или ручная отметка)</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">
+    <span>Меньше:</span>
+    <div class="day"></div>
+    <div class="day active"></div>
+    <span>Больше</span>
+    <span style="margin-left:12px">🔵 — сегодня</span>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const usernameEl = $('username');
+  const startDateEl = $('startDate');
+  const endDateEl = $('endDate');
+  const goalDaysEl = $('goalDays');
+  const gridEl = $('grid');
+  const messageEl = $('message');
+  const apiStatusEl = $('apiStatus');
+  const fetchBtn = $('fetchBtn');
+
+  const fmt = d => d.toISOString().slice(0, 10);
+  const today = () => fmt(new Date());
+  const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+
+  // ---------- Хранилище ----------
+  function loadSettings() {
+    const s = JSON.parse(localStorage.getItem('ghCounter') || '{}');
+    usernameEl.value    = s.username || '';
+    startDateEl.value   = s.start    || today();
+    endDateEl.value     = s.end      || fmt(new Date(Date.now() + 100 * 86400000));
+    goalDaysEl.value    = s.goal     || 100;
+  }
+  function saveSettings() {
+    localStorage.setItem('ghCounter', JSON.stringify({
+      username: usernameEl.value.trim(),
+      start: startDateEl.value,
+      end:   endDateEl.value,
+      goal:  goalDaysEl.value
+    }));
+  }
+  function loadManual() {
+    return JSON.parse(localStorage.getItem('ghManual') || '{}');
+  }
+  function saveManual(m) {
+    localStorage.setItem('ghManual', JSON.stringify(m));
+  }
+  function loadApiCache() {
+    return JSON.parse(localStorage.getItem('ghApiCache') || '{}');
+    // формат: { username, fetchedAt, days: { "YYYY-MM-DD": count, ... } }
+  }
+  function saveApiCache(c) {
+    localStorage.setItem('ghApiCache', JSON.stringify(c));
+  }
+
+  // ---------- GitHub API ----------
+  async function fetchGitHubActivity(username) {
+    // Публичный events endpoint: до 300 событий за последние 90 дней.
+    // Не требует токена. Rate limit: 60 req/hour без токена.
+    const url = `https://api.github.com/users/${encodeURIComponent(username)}/events/public?per_page=100`;
+
+    // Запрашиваем до 3 страниц (300 событий)
+    const allEvents = [];
+    for (let page = 1; page <= 3; page++) {
+      const res = await fetch(`${url}&page=${page}`, {
+        headers: { 'Accept': 'application/vnd.github+json' }
+      });
+      if (res.status === 404) throw new Error('Пользователь не найден');
+      if (res.status === 403) throw new Error('Превышен лимит запросов (rate limit). Подожди час или используй токен.');
+      if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
+      const data = await res.json();
+      if (!data.length) break;
+      allEvents.push(...data);
+      if (data.length < 100) break;
+    }
+
+    // Считаем коммиты по дням (только PushEvent)
+    const days = {};
+    for (const ev of allEvents) {
+      if (ev.type !== 'PushEvent') continue;
+      const day = ev.created_at.slice(0, 10);
+      const commits = (ev.payload && ev.payload.commits) || [];
+      days[day] = (days[day] || 0) + Math.max(1, commits.length);
+    }
+
+    return {
+      username,
+      fetchedAt: new Date().toISOString(),
+      days
+    };
+  }
+
+  async function handleFetch() {
+    const username = usernameEl.value.trim();
+    if (!username) {
+      apiStatusEl.innerHTML = '⚠️ Введи GitHub username.';
+      return;
+    }
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<span class="spinner"></span>Загрузка...';
+    apiStatusEl.innerHTML = '<span class="spinner"></span>Запрашиваю GitHub API...';
+    try {
+      const cache = await fetchGitHubActivity(username);
+      saveApiCache(cache);
+      const count = Object.keys(cache.days).length;
+      const dates = Object.keys(cache.days).sort();
+      const oldest = dates[0] || '—';
+      const newest = dates[dates.length - 1] || '—';
+      apiStatusEl.innerHTML =
+        `✅ Загружено для <strong>@${username}</strong>. ` +
+        `Активных дней в API: <strong>${count}</strong>. ` +
+        `Диапазон: ${oldest} → ${newest}. ` +
+        `Обновлено: ${new Date(cache.fetchedAt).toLocaleString()}.`;
+      render();
+    } catch (e) {
+      apiStatusEl.innerHTML = `❌ ${e.message}`;
+    } finally {
+      fetchBtn.disabled = false;
+      fetchBtn.innerHTML = '🔄 Загрузить коммиты с GitHub';
+    }
+  }
+
+  // ---------- Рендер ----------
+  function render() {
+    const start = startDateEl.value;
+    const end   = endDateEl.value;
+    const goal  = parseInt(goalDaysEl.value) || 0;
+    const manual = loadManual();
+    const apiCache = loadApiCache();
+    const apiDays = (apiCache.username === usernameEl.value.trim()) ? (apiCache.days || {}) : {};
+    const todayStr = today();
+
+    // Объединённая активность: день активен, если есть в manual ИЛИ в api
+    const active = {};
+    for (const d in manual) if (manual[d]) active[d] = { source: 'manual' };
+    for (const d in apiDays) if (apiDays[d]) active[d] = { source: 'api', count: apiDays[d] };
+
+    const totalDays = daysBetween(start, end) + 1;
+    const daysPassed = Math.max(0, daysBetween(start, todayStr) + 1);
+    const activeCount = Object.keys(active).filter(d => d >= start && d <= end).length;
+    const daysLeft = Math.max(0, goal - activeCount);
+    const calendarLeft = Math.max(0, daysBetween(todayStr, end) + (todayStr <= end ? 1 : 0));
+
+    $('daysPassed').textContent = daysPassed;
+    $('activeDays').textContent = activeCount;
+    $('daysLeft').textContent = daysLeft;
+    $('daysRemaining').textContent = calendarLeft;
+
+    const progress = goal > 0 ? Math.min(100, (activeCount / goal) * 100) : 0;
+    $('progressFill').style.width = progress + '%';
+
+    // Сообщение
+    let msg = '', cls = '';
+    if (activeCount >= goal) {
+      msg = `🎉 Цель достигнута! ${activeCount} активных дней из ${goal}.`;
+      cls = 'success';
+    } else if (todayStr > end) {
+      msg = `⏰ Период закончился. Набрано ${activeCount} из ${goal}.`;
+      cls = 'warning';
+    } else {
+      if (daysLeft > calendarLeft) {
+        msg = `⚠️ Нужно ещё ${daysLeft} активных дней, а календарных осталось ${calendarLeft}.`;
+        cls = 'warning';
+      } else {
+        msg = `🚀 Осталось ${daysLeft} активных дней из ${goal}. В запасе ${calendarLeft} календарных.`;
+      }
+    }
+    messageEl.textContent = msg;
+    messageEl.className = 'message ' + cls;
+
+    // Сетка
+    gridEl.innerHTML = '';
+    const maxShow = Math.min(Math.max(0, totalDays), 730);
+    for (let i = 0; i < maxShow; i++) {
+      const d = new Date(new Date(start).getTime() + i * 86400000);
+      const ds = fmt(d);
+      const cell = document.createElement('div');
+      cell.className = 'day';
+      const info = active[ds];
+      if (info) cell.classList.add('active');
+      if (ds === todayStr) cell.classList.add('today');
+      let title = ds;
+      if (info) {
+        title += info.source === 'api'
+          ? ` ✓ ${info.count} коммит(ов) с GitHub`
+          : ' ✓ ручная отметка';
+      }
+      cell.title = title;
+      cell.onclick = () => {
+        const m = loadManual();
+        m[ds] = !m[ds];
+        if (!m[ds]) delete m[ds];
+        saveManual(m);
+        render();
+      };
+      gridEl.appendChild(cell);
+    }
+  }
+
+  // ---------- События ----------
+  [usernameEl, startDateEl, endDateEl, goalDaysEl].forEach(el => {
+    el.addEventListener('change', () => { saveSettings(); render(); });
+  });
+
+  fetchBtn.onclick = handleFetch;
+
+  $('markToday').onclick = () => {
+    const m = loadManual();
+    m[today()] = true;
+    saveManual(m);
+    render();
+  };
+  $('unmarkToday').onclick = () => {
+    const m = loadManual();
+    delete m[today()];
+    saveManual(m);
+    render();
+  };
+  $('reset').onclick = () => {
+    if (confirm('Сбросить только ручные отметки? Данные с GitHub останутся.')) {
+      localStorage.removeItem('ghManual');
+      render();
+    }
+  };
+
+  // ---------- Автозагрузка при старте ----------
+  async function init() {
+    loadSettings();
+    const username = usernameEl.value.trim();
+    const cache = loadApiCache();
+    if (username && cache.username === username && cache.fetchedAt) {
+      const ageH = (Date.now() - new Date(cache.fetchedAt).getTime()) / 3600000;
+      const count = Object.keys(cache.days || {}).length;
+      apiStatusEl.innerHTML =
+        `💾 Кэш для <strong>@${username}</strong> (${count} активных дней, ` +
+        `обновлён ${ageH.toFixed(1)} ч назад). ` +
+        `Нажми «Загрузить», чтобы освежить.`;
+    }
+    render();
+  }
+  init();
+</script>
+</body>
+</html>
